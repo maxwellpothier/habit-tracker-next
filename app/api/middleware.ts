@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
+import { z } from "zod";
 
 type Context = {
 	startTime?: number;
 	[key: string]: unknown;
 };
+
+const BodySchema = z.object({
+	name: z.string().min(1),
+});
 
 type ContextHandler = (
 	req: NextRequest,
@@ -43,4 +48,27 @@ export const requestIdMiddleware: Middleware = async (req, context, next) => {
 	const response = await next();
 	response.headers.set("x-request-id", requestId);
 	return response;
+};
+
+export const validateBodyMiddleware: Middleware = async (
+	req,
+	context,
+	next
+) => {
+	const body = await req.json();
+	console.log("body", body);
+	try {
+		const validatedBody = BodySchema.parse(body);
+		context.validatedBody = validatedBody;
+		return next();
+	} catch (e) {
+		if (e instanceof z.ZodError) {
+			console.log("zod error");
+			return NextResponse.json(
+				{ error: "Invalid body" },
+				{ status: 400 }
+			);
+		}
+		throw e;
+	}
 };
